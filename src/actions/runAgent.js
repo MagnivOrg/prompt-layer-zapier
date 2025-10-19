@@ -156,7 +156,25 @@ const runAgent = {
         });
 
         if (pollResp.status === 200) {
-          return pollResp.json;
+          // Ensure we always return an object
+          const result = pollResp.json || pollResp.data || pollResp.body;
+
+          // Debug logging (remove in production)
+          console.log("Poll response result type:", typeof result);
+          console.log("Poll response result:", result);
+
+          if (typeof result === "string") {
+            return { result: result, status: "completed" };
+          }
+          if (typeof result === "object" && result !== null) {
+            return result;
+          }
+          // Fallback for any other type
+          return {
+            result: result,
+            status: "completed",
+            raw_response: pollResp,
+          };
         } else if (pollResp.status === 202) {
           await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
         } else {

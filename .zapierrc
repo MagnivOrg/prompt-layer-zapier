@@ -1,0 +1,5 @@
+{
+  "skipNodeModules": false,
+  "skipInstall": false,
+  "skipBuild": false
+}

@@ -1,0 +1,17 @@
+{
+  "name": "zapier-action",
+  "version": "1.0.0",
+  "description": "PromptLayer RunAgent Zapier Integration",
+  "scripts": {
+    "test": "node test/runTests.js",
+    "test:jest": "jest"
+  },
+  "dependencies": {
+    "zapier-platform-core": "17.8.0"
+  },
+  "devDependencies": {
+    "jest": "^29.6.0"
+  },
+  "private": true,
+  "main": "./index.js"
+}

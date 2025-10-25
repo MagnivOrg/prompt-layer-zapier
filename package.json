@@ -1,5 +1,6 @@
 {
-  "name": "zapier-action",
+  "name": "promptlayer-zapier-action",
+  "author": "cmdrGuyson",
   "version": "1.0.0",
   "description": "PromptLayer RunAgent Zapier Integration",
   "scripts": {
@@ -7,7 +8,7 @@
     "test:jest": "jest"
   },
   "dependencies": {
-    "zapier-platform-core": "17.8.0"
+    "zapier-platform-core": "17.9.0"
   },
   "devDependencies": {
     "jest": "^29.6.0"

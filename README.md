@@ -1,15 +1,6 @@
 # PromptLayer RunAgent Zapier Integration
 
-This package provides a custom zapier action for running [PromptLayer Agents](https://promptlayer.com/) directly from your zapier workflows. The **PromptLayer RunAgent** node allows you to execute PromptLayer Agents, pass input variables, select agent versions or labels, and retrieve results programmatically.
-
-## Features
-
-- **Single Action**: Run Agent with internal polling (mirrors n8n behavior)
-- **API Key Authentication**: Secure authentication via X-API-KEY header
-- **Dynamic Agent Selection**: Loads available agents from PromptLayer API
-- **Version Control**: Support for both version numbers and label names
-- **Configurable Timeout**: Default 10 minutes, user-configurable
-- **JavaScript**: Pure JavaScript implementation for Zapier compatibility
+This package provides a custom zapier action for running [PromptLayer Agents](https://promptlayer.com/) directly from your zapier workflows. The **PromptLayer** node allows you to execute PromptLayer Agents, pass input variables, select agent versions or labels, and retrieve results.
 
 ## Setup
 
@@ -35,7 +26,7 @@ This package provides a custom zapier action for running [PromptLayer Agents](ht
 
 3. Test in Zapier Editor:
    - Create a new Zap
-   - Add "PromptLayer RunAgent" as an action
+   - Add "PromptLayer" as an action
    - Configure your API key
    - Select an agent and provide input variables
 
@@ -60,40 +51,3 @@ Executes a PromptLayer agent and waits for completion.
 
 **Output:**
 Returns the final execution result from the PromptLayer API.
-
-## Development
-
-- Source files are in `src/` (JavaScript)
-- Main entry point is `index.js`
-- No build step required
-- Tests in `test/` directory with both simple runner and Jest
-
-## Testing
-
-The integration includes comprehensive tests covering:
-
-- **Structure validation**: Authentication, resources, and action configuration
-- **Successful execution**: Complete agent run with polling
-- **Error handling**: Invalid JSON, missing execution ID, unexpected status codes
-- **Timeout handling**: Proper timeout behavior
-- **Input processing**: Version numbers, label names, metadata, return flags
-
-Run tests with:
-
-```bash
-yarn test          # Simple test runner
-yarn test:jest     # Jest test suite
-```
-
-## API Endpoints Used
-
-- `GET /workflows` - List available agents
-- `POST /workflows/{agentName}/run` - Start agent execution
-- `GET /workflow-version-execution-results` - Check execution status
-
-## Error Handling
-
-- Invalid JSON parsing with clear error messages
-- Timeout handling with configurable limits
-- API error propagation with status codes
-- Missing execution ID detection

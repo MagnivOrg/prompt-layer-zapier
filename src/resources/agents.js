@@ -1,10 +1,19 @@
 const agentsResource = {
   key: "agents",
   noun: "Agent",
+  sample: {
+    id: 123,
+    name: "Test Agent",
+  },
+  outputFields: [
+    { key: "id", label: "ID", type: "integer" },
+    { key: "name", label: "Name", type: "string" },
+  ],
   list: {
     display: {
       label: "List Agents",
       description: "Load available agents",
+      hidden: true,
     },
     operation: {
       perform: async (z) => {
@@ -27,6 +36,14 @@ const agentsResource = {
 
         return allAgents;
       },
+      sample: {
+        id: 123,
+        name: "Test Agent",
+      },
+      outputFields: [
+        { key: "id", type: "integer" },
+        { key: "name", type: "string" },
+      ],
     },
   },
 };

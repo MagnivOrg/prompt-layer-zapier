@@ -60,6 +60,7 @@ const runAgent = {
         type: "text",
         required: false,
         helpText: "Optional JSON metadata",
+        default: "{}",
       },
       {
         key: "timeout",
@@ -70,6 +71,16 @@ const runAgent = {
         helpText: "Maximum time to wait for completion",
       },
     ],
+    outputFields: [
+      { key: "result", type: "string", label: "Primary Result" },
+      { key: "data", type: "string", label: "Data" },
+      { key: "status", type: "string", label: "Status" },
+      { key: "raw_response", type: "string", label: "Raw Response" },
+    ],
+    sample: {
+      result: "success",
+      data: "test output",
+    },
     perform: async (z, bundle) => {
       const {
         agentName,
@@ -158,10 +169,6 @@ const runAgent = {
         if (pollResp.status === 200) {
           // Ensure we always return an object
           const result = pollResp.json || pollResp.data || pollResp.body;
-
-          // Debug logging (remove in production)
-          console.log("Poll response result type:", typeof result);
-          console.log("Poll response result:", result);
 
           if (typeof result === "string") {
             return { result: result, status: "completed" };

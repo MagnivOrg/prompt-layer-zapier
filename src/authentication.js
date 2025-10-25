@@ -6,13 +6,14 @@ const authentication = {
       type: "string",
       required: true,
       label: "API Key",
-      helpText: "Your PromptLayer API Key",
+      helpText: "Your PromptLayer API Key. See: https://docs.promptlayer.com",
     },
   ],
   test: {
     url: "https://api.promptlayer.com/prompt-templates",
   },
-  connectionLabel: "PromptLayer ({{bundle.authData.apiKey.substring(0,4)}}...)",
+
+  connectionLabel: "PromptLayer Account",
 };
 
 const addApiKeyHeader = (request, z, bundle) => {

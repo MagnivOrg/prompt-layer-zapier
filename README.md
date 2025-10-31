@@ -41,9 +41,8 @@ Executes a PromptLayer agent and waits for completion.
 **Input Fields:**
 
 - `agentName` (required): Select from available agents
-- `useAgentLabel` (boolean): Use label name instead of version number
-- `agentVersionNumber` (integer): Specific version number (when not using label)
-- `agentLabelName` (string): Specific label name (when using label)
+- `agentVersionNumber` (integer, optional): Specific version number to run (takes precedence)
+- `agentLabelName` (string, optional): Specific label name to run (used if no version)
 - `inputVariables` (JSON): Input variables for the agent
 - `returnAllOutputs` (boolean): Return all outputs from execution
 - `metadata` (JSON): Optional metadata

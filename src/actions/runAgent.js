@@ -16,15 +16,6 @@ const runAgent = {
         helpText: "Select the agent to run",
       },
       {
-        key: "useAgentLabel",
-        label: "Use Agent Label Name",
-        type: "boolean",
-        required: false,
-        default: "false",
-        altersDynamicFields: true,
-        helpText: "Use label name instead of version number",
-      },
-      {
         key: "agentVersionNumber",
         label: "Agent Version Number",
         type: "integer",
@@ -84,7 +75,6 @@ const runAgent = {
     perform: async (z, bundle) => {
       const {
         agentName,
-        useAgentLabel,
         agentVersionNumber,
         agentLabelName,
         inputVariables,
@@ -113,10 +103,11 @@ const runAgent = {
         return_all_outputs: Boolean(returnAllOutputs),
       };
 
-      if (useAgentLabel && agentLabelName) {
-        body.workflow_label_name = agentLabelName;
-      } else if (!useAgentLabel && agentVersionNumber != null) {
+      // Prefer explicit version number if provided; otherwise fall back to label.
+      if (agentVersionNumber != null) {
         body.workflow_version_number = Number(agentVersionNumber);
+      } else if (agentLabelName) {
+        body.workflow_label_name = agentLabelName;
       }
 
       if (metadata) {

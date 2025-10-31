@@ -5,8 +5,9 @@ const authentication = {
       key: "apiKey",
       type: "string",
       required: true,
-      label: "API Key",
-      helpText: "Your PromptLayer API Key. See: https://docs.promptlayer.com",
+      label: "PromptLayer API Key",
+      helpText:
+        "Generate a new PromptLayer API Key in the dashboard. Log into PromptLayer, navigate to settings, generate a new PromptLayer API Key\nhttps://dashboard.promptlayer.com/",
     },
   ],
   test: {

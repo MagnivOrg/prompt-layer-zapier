@@ -48,6 +48,16 @@ const createMockZ = (requestResponses = []) => {
   let callCount = 0;
   const requestCalls = [];
 
+  // Create a proper Error class for Zapier errors
+  class ZapierError extends Error {
+    constructor(message, code, status) {
+      super(message);
+      this.name = "ZapierError";
+      this.code = code;
+      this.status = status;
+    }
+  }
+
   return {
     request: (options) => {
       requestCalls.push(options);
@@ -57,7 +67,8 @@ const createMockZ = (requestResponses = []) => {
       callCount++;
       return Promise.resolve(response);
     },
-    errors: { Error: Error },
+    generateCallbackUrl: async () => "https://hooks.zapier.com/test-callback-url",
+    errors: { Error: ZapierError },
     getRequestCalls: () => requestCalls,
     getCallCount: () => callCount,
   };
@@ -69,7 +80,6 @@ const createMockBundle = (inputData = {}) => ({
   inputData: {
     agentName: "test-agent",
     inputVariables: '{"key": "value"}',
-    timeout: 1, // 1 minute for testing
     ...inputData,
   },
 });
@@ -129,45 +139,35 @@ runner.test("Run agent action should have correct structure", () => {
 runner.test("Run agent should complete successfully", async () => {
   const mockZ = createMockZ([
     { json: { workflow_version_execution_id: 123 } },
-    { status: 200, json: { result: "success", data: "test output" } },
   ]);
   const mockBundle = createMockBundle();
 
   const result = await runAgent.operation.perform(mockZ, mockBundle);
 
-  if (result.result !== "success") {
-    throw new Error("Expected successful result");
+  if (result.workflow_version_execution_id !== 123) {
+    throw new Error("Expected workflow_version_execution_id in result");
   }
-  if (mockZ.getCallCount() !== 2) {
-    throw new Error("Expected 2 API calls (start + poll)");
+  if (mockZ.getCallCount() !== 1) {
+    throw new Error("Expected 1 API call (start with callback)");
+  }
+  const startCall = mockZ.getRequestCalls()[0];
+  if (!startCall.body.callback_url) {
+    throw new Error("Expected callback_url in request body");
   }
 });
 
-// Test timeout handling
-runner.test("Run agent should handle timeout", async () => {
+// Test callback URL generation
+runner.test("Run agent should generate callback URL", async () => {
   const mockZ = createMockZ([
     { json: { workflow_version_execution_id: 123 } },
-    { status: 202, json: { status: "pending" } },
   ]);
-  const mockBundle = createMockBundle({ timeout: 0.01 }); // Very short timeout
+  const mockBundle = createMockBundle();
 
-  // Mock Date.now to simulate timeout
-  const originalDateNow = Date.now;
-  let callCount = 0;
-  Date.now = () => {
-    callCount++;
-    return callCount === 1 ? 0 : 10000; // 10 seconds, past timeout
-  };
+  await runAgent.operation.perform(mockZ, mockBundle);
 
-  try {
-    await runAgent.operation.perform(mockZ, mockBundle);
-    throw new Error("Expected timeout error");
-  } catch (error) {
-    if (!error.message.includes("timed out")) {
-      throw new Error("Expected timeout error message");
-    }
-  } finally {
-    Date.now = originalDateNow;
+  const startCall = mockZ.getRequestCalls()[0];
+  if (startCall.body.callback_url !== "https://hooks.zapier.com/test-callback-url") {
+    throw new Error("Expected callback URL to be set");
   }
 });
 
@@ -219,21 +219,25 @@ runner.test("Run agent should handle missing execution ID", async () => {
   }
 });
 
-// Test unexpected status code
-runner.test("Run agent should handle unexpected status code", async () => {
-  const mockZ = createMockZ([
-    { json: { workflow_version_execution_id: 123 } },
-    { status: 500, json: { error: "Internal server error" } },
-  ]);
-  const mockBundle = createMockBundle();
+// Test performResume with webhook callback
+runner.test("Run agent should handle webhook callback", async () => {
+  const mockZ = createMockZ();
+  const resumeBundle = {
+    cleanedRequest: {
+      content: {
+        workflow_version_execution_id: 123,
+        final_output: "test result",
+      },
+    },
+  };
 
-  try {
-    await runAgent.operation.perform(mockZ, mockBundle);
-    throw new Error("Expected unexpected status error");
-  } catch (error) {
-    if (!error.message.includes("Unexpected status 500")) {
-      throw new Error("Expected unexpected status error message");
-    }
+  const result = await runAgent.operation.performResume(mockZ, resumeBundle);
+
+  if (result.result !== "test result") {
+    throw new Error("Expected result from webhook callback");
+  }
+  if (result.status !== "completed") {
+    throw new Error("Expected status to be completed");
   }
 });
 
@@ -241,10 +245,8 @@ runner.test("Run agent should handle unexpected status code", async () => {
 runner.test("Run agent should handle agent version number", async () => {
   const mockZ = createMockZ([
     { json: { workflow_version_execution_id: 123 } },
-    { status: 200, json: { result: "success" } },
   ]);
   const mockBundle = createMockBundle({
-    useAgentLabel: false,
     agentVersionNumber: 5,
   });
 
@@ -256,16 +258,17 @@ runner.test("Run agent should handle agent version number", async () => {
   if (requestBody.workflow_version_number !== 5) {
     throw new Error("Expected workflow_version_number to be set");
   }
+  if (!requestBody.callback_url) {
+    throw new Error("Expected callback_url to be set");
+  }
 });
 
 // Test agent label name handling
 runner.test("Run agent should handle agent label name", async () => {
   const mockZ = createMockZ([
     { json: { workflow_version_execution_id: 123 } },
-    { status: 200, json: { result: "success" } },
   ]);
   const mockBundle = createMockBundle({
-    useAgentLabel: true,
     agentLabelName: "production",
   });
 
@@ -277,13 +280,15 @@ runner.test("Run agent should handle agent label name", async () => {
   if (requestBody.workflow_label_name !== "production") {
     throw new Error("Expected workflow_label_name to be set");
   }
+  if (!requestBody.callback_url) {
+    throw new Error("Expected callback_url to be set");
+  }
 });
 
 // Test return all outputs flag
 runner.test("Run agent should handle return all outputs flag", async () => {
   const mockZ = createMockZ([
     { json: { workflow_version_execution_id: 123 } },
-    { status: 200, json: { result: "success" } },
   ]);
   const mockBundle = createMockBundle({
     returnAllOutputs: true,
@@ -297,13 +302,15 @@ runner.test("Run agent should handle return all outputs flag", async () => {
   if (requestBody.return_all_outputs !== true) {
     throw new Error("Expected return_all_outputs to be true");
   }
+  if (!requestBody.callback_url) {
+    throw new Error("Expected callback_url to be set");
+  }
 });
 
 // Test metadata handling
 runner.test("Run agent should handle metadata", async () => {
   const mockZ = createMockZ([
     { json: { workflow_version_execution_id: 123 } },
-    { status: 200, json: { result: "success" } },
   ]);
   const mockBundle = createMockBundle({
     metadata: '{"key": "value"}',
@@ -316,6 +323,9 @@ runner.test("Run agent should handle metadata", async () => {
 
   if (!requestBody.metadata || requestBody.metadata.key !== "value") {
     throw new Error("Expected metadata to be parsed and included");
+  }
+  if (!requestBody.callback_url) {
+    throw new Error("Expected callback_url to be set");
   }
 });
 

@@ -1,9 +1,12 @@
+const { normalizeJsonString } = require("../utils.js");
+
 const runAgent = {
   key: "run_agent",
   noun: "Agent",
   display: {
     label: "Run Agent",
-    description: "Execute a PromptLayer agent and wait for completion",
+    description:
+      "Execute a PromptLayer agent asynchronously via webhook callback",
   },
   operation: {
     inputFields: [
@@ -53,14 +56,6 @@ const runAgent = {
         helpText: "Optional JSON metadata",
         default: "{}",
       },
-      {
-        key: "timeout",
-        label: "Timeout (minutes)",
-        type: "integer",
-        required: false,
-        default: "10",
-        helpText: "Maximum time to wait for completion",
-      },
     ],
     outputFields: [
       { key: "result", type: "string", label: "Primary Result" },
@@ -80,19 +75,49 @@ const runAgent = {
         inputVariables,
         returnAllOutputs,
         metadata,
-        timeout,
       } = bundle.inputData;
 
       // Parse JSON inputs
       let parsedInputVariables;
       try {
-        parsedInputVariables =
-          typeof inputVariables === "string"
-            ? JSON.parse(inputVariables)
-            : inputVariables;
+        if (typeof inputVariables === "string") {
+          // Try parsing as-is first
+          try {
+            parsedInputVariables = JSON.parse(inputVariables);
+          } catch (firstError) {
+            // If it fails with control character error, try normalizing newlines
+            if (
+              firstError.message &&
+              firstError.message.includes("control character")
+            ) {
+              try {
+                const normalized = normalizeJsonString(inputVariables);
+                parsedInputVariables = JSON.parse(normalized);
+              } catch (secondError) {
+                // If normalization doesn't help, throw original error with helpful message
+                throw new z.errors.Error(
+                  `Invalid JSON in Input Variables: ${firstError.message}. ` +
+                    `Tip: Multi-line strings in JSON need \\n escape sequences. ` +
+                    `For example, use "line1\\nline2" instead of a multi-line string.`,
+                  "InvalidData",
+                  400
+                );
+              }
+            } else {
+              throw firstError;
+            }
+          }
+        } else {
+          parsedInputVariables = inputVariables;
+        }
       } catch (e) {
+        // If it's already a Zapier error, re-throw it
+        if (e instanceof z.errors.Error) {
+          throw e;
+        }
+        const errorMessage = e.message || "Invalid JSON in Input Variables";
         throw new z.errors.Error(
-          "Invalid JSON in Input Variables",
+          `Invalid JSON in Input Variables: ${errorMessage}`,
           "InvalidData",
           400
         );
@@ -112,18 +137,57 @@ const runAgent = {
 
       if (metadata) {
         try {
-          body.metadata =
-            typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+          if (typeof metadata === "string") {
+            // Try parsing as-is first
+            try {
+              body.metadata = JSON.parse(metadata);
+            } catch (firstError) {
+              // If it fails with control character error, try normalizing newlines
+              if (
+                firstError.message &&
+                firstError.message.includes("control character")
+              ) {
+                try {
+                  const normalized = normalizeJsonString(metadata);
+                  body.metadata = JSON.parse(normalized);
+                } catch (secondError) {
+                  // If normalization doesn't help, throw original error with helpful message
+                  throw new z.errors.Error(
+                    `Invalid JSON in Metadata: ${firstError.message}. ` +
+                      `Tip: Multi-line strings in JSON need \\n escape sequences. ` +
+                      `For example, use "line1\\nline2" instead of a multi-line string.`,
+                    "InvalidData",
+                    400
+                  );
+                }
+              } else {
+                throw firstError;
+              }
+            }
+          } else {
+            body.metadata = metadata;
+          }
         } catch (e) {
+          // If it's already a Zapier error, re-throw it
+          if (e instanceof z.errors.Error) {
+            throw e;
+          }
+          const errorMessage = e.message || "Invalid JSON in Metadata";
           throw new z.errors.Error(
-            "Invalid JSON in Metadata",
+            `Invalid JSON in Metadata: ${errorMessage}`,
             "InvalidData",
             400
           );
         }
       }
 
-      // Start execution
+      // Generate callback URL for webhook
+      const callbackUrl = await z.generateCallbackUrl();
+
+      // Add callback URL to request body
+      body.callback_url = callbackUrl;
+
+      // Start execution with callback URL
       const startResp = await z.request({
         method: "POST",
         url: `https://api.promptlayer.com/workflows/${encodeURIComponent(
@@ -141,54 +205,68 @@ const runAgent = {
         );
       }
 
-      // Poll for completion
-      const timeoutMs = (timeout ?? 10) * 60 * 1000;
-      const startTime = Date.now();
-      const pollIntervalMs = 5000;
+      // Return minimal object - Zap will wait for webhook callback
+      return {
+        workflow_version_execution_id: executionId,
+        agentName: agentName,
+        returnAllOutputs: Boolean(returnAllOutputs),
+      };
+    },
+    performResume: async (z, bundle) => {
+      // Parse the webhook payload from PromptLayer
+      const payload = bundle.cleanedRequest.content || bundle.cleanedRequest;
 
-      while (Date.now() - startTime < timeoutMs) {
-        const pollResp = await z.request({
-          method: "GET",
-          url: "https://api.promptlayer.com/workflow-version-execution-results",
-          params: {
-            workflow_version_execution_id: executionId,
-            return_all_outputs: Boolean(returnAllOutputs),
-          },
-          throwForStatus: false,
-        });
-
-        if (pollResp.status === 200) {
-          // Ensure we always return an object
-          const result = pollResp.json || pollResp.data || pollResp.body;
-
-          if (typeof result === "string") {
-            return { result: result, status: "completed" };
-          }
-          if (typeof result === "object" && result !== null) {
-            return result;
-          }
-          // Fallback for any other type
-          return {
-            result: result,
-            status: "completed",
-            raw_response: pollResp,
-          };
-        } else if (pollResp.status === 202) {
-          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-        } else {
-          throw new z.errors.Error(
-            `Unexpected status ${pollResp.status}`,
-            "PromptLayerError",
-            pollResp.status
-          );
-        }
+      // Check if payload is missing or empty
+      if (
+        !payload ||
+        (typeof payload === "object" &&
+          Object.keys(payload).length === 0 &&
+          !Array.isArray(payload))
+      ) {
+        throw new z.errors.Error("Missing webhook payload", "InvalidData", 400);
       }
 
-      throw new z.errors.Error(
-        `Execution timed out after ${timeout ?? 10} minutes`,
-        "Timeout",
-        408
-      );
+      // Extract final_output from the callback payload
+      // According to PromptLayer docs, the callback payload structure is:
+      // {
+      //   "workflow_version_execution_id": 123,
+      //   "final_output": { ... } // or just the value if return_all_outputs is false
+      // }
+      const finalOutput = payload.final_output || payload;
+
+      // If return_all_outputs was true, final_output will be an object with node outputs
+      if (
+        typeof finalOutput === "object" &&
+        finalOutput !== null &&
+        !Array.isArray(finalOutput)
+      ) {
+        // Check if it's the node outputs structure (has status, value, etc.)
+        const firstKey = Object.keys(finalOutput)[0];
+        if (
+          firstKey &&
+          typeof finalOutput[firstKey] === "object" &&
+          finalOutput[firstKey] !== null &&
+          ("status" in finalOutput[firstKey] ||
+            "value" in finalOutput[firstKey])
+        ) {
+          // This is the all outputs format - return it directly
+          return finalOutput;
+        }
+        // Otherwise, it might be a simple object result
+        return finalOutput;
+      }
+
+      // If it's a string or primitive value, normalize it
+      if (typeof finalOutput === "string") {
+        return { result: finalOutput, status: "completed" };
+      }
+
+      // For any other type, return with status
+      return {
+        result: finalOutput,
+        status: "completed",
+        raw_response: JSON.stringify(payload),
+      };
     },
   },
 };

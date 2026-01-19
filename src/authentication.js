@@ -13,8 +13,6 @@ const authentication = {
   test: {
     url: "https://api.promptlayer.com/prompt-templates",
   },
-
-  connectionLabel: "PromptLayer Account",
 };
 
 const addApiKeyHeader = (request, z, bundle) => {

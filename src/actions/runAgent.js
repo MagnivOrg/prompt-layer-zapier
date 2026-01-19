@@ -3,8 +3,7 @@ const runAgent = {
   noun: "Agent",
   display: {
     label: "Run Agent",
-    description:
-      "Execute a PromptLayer agent asynchronously via webhook callback",
+    description: "Runs an agent.",
   },
   operation: {
     inputFields: [

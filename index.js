@@ -9,6 +9,9 @@ module.exports = {
   platformVersion,
   authentication,
   beforeRequest: [addApiKeyHeader],
+  flags: {
+    cleanInputData: false,
+  },
   resources: {
     [agentsResource.key]: agentsResource,
   },

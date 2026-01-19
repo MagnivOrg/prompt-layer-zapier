@@ -8,7 +8,7 @@
     "test:jest": "jest"
   },
   "dependencies": {
-    "zapier-platform-core": "17.9.0"
+    "zapier-platform-core": "18.0.7"
   },
   "devDependencies": {
     "jest": "^29.6.0"

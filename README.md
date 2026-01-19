@@ -43,9 +43,9 @@ Executes a PromptLayer agent and waits for completion.
 - `agentName` (required): Select from available agents
 - `agentVersionNumber` (integer, optional): Specific version number to run (takes precedence)
 - `agentLabelName` (string, optional): Specific label name to run (used if no version)
-- `inputVariables` (JSON): Input variables for the agent
+- `inputVariables` (dictionary, required): Input variables for the agent (key-value pairs)
 - `returnAllOutputs` (boolean): Return all outputs from execution
-- `metadata` (JSON): Optional metadata
+- `metadata` (dictionary, optional): Optional metadata (key-value pairs)
 - `timeout` (integer): Maximum wait time in minutes (default: 10)
 
 **Output:**

@@ -1,5 +1,3 @@
-const { normalizeJsonString } = require("../utils.js");
-
 const runAgent = {
   key: "run_agent",
   noun: "Agent",
@@ -35,10 +33,10 @@ const runAgent = {
       {
         key: "inputVariables",
         label: "Input Variables",
-        type: "text",
+        type: "string",
         required: true,
-        default: "{}",
-        helpText: "JSON object of input variables for the agent",
+        dict: true,
+        helpText: "Input variables for the agent",
       },
       {
         key: "returnAllOutputs",
@@ -51,10 +49,10 @@ const runAgent = {
       {
         key: "metadata",
         label: "Metadata",
-        type: "text",
+        type: "string",
         required: false,
-        helpText: "Optional JSON metadata",
-        default: "{}",
+        dict: true,
+        helpText: "Optional metadata",
       },
     ],
     outputFields: [
@@ -77,47 +75,19 @@ const runAgent = {
         metadata,
       } = bundle.inputData;
 
-      // Parse JSON inputs
-      let parsedInputVariables;
-      try {
-        if (typeof inputVariables === "string") {
-          // Try parsing as-is first
-          try {
-            parsedInputVariables = JSON.parse(inputVariables);
-          } catch (firstError) {
-            // If it fails with control character error, try normalizing newlines
-            if (
-              firstError.message &&
-              firstError.message.includes("control character")
-            ) {
-              try {
-                const normalized = normalizeJsonString(inputVariables);
-                parsedInputVariables = JSON.parse(normalized);
-              } catch (secondError) {
-                // If normalization doesn't help, throw original error with helpful message
-                throw new z.errors.Error(
-                  `Invalid JSON in Input Variables: ${firstError.message}. ` +
-                    `Tip: Multi-line strings in JSON need \\n escape sequences. ` +
-                    `For example, use "line1\\nline2" instead of a multi-line string.`,
-                  "InvalidData",
-                  400
-                );
-              }
-            } else {
-              throw firstError;
-            }
-          }
-        } else {
-          parsedInputVariables = inputVariables;
-        }
-      } catch (e) {
-        // If it's already a Zapier error, re-throw it
-        if (e instanceof z.errors.Error) {
-          throw e;
-        }
-        const errorMessage = e.message || "Invalid JSON in Input Variables";
+      // With dict type, inputVariables will be passed as an object
+      // Just validate it's an object
+      const parsedInputVariables =
+        typeof inputVariables === "object" && inputVariables !== null
+          ? inputVariables
+          : {};
+
+      if (
+        typeof parsedInputVariables !== "object" ||
+        parsedInputVariables === null
+      ) {
         throw new z.errors.Error(
-          `Invalid JSON in Input Variables: ${errorMessage}`,
+          "Input Variables must be a valid object",
           "InvalidData",
           400
         );
@@ -135,50 +105,14 @@ const runAgent = {
         body.workflow_label_name = agentLabelName;
       }
 
-      if (metadata) {
-        try {
-          if (typeof metadata === "string") {
-            // Try parsing as-is first
-            try {
-              body.metadata = JSON.parse(metadata);
-            } catch (firstError) {
-              // If it fails with control character error, try normalizing newlines
-              if (
-                firstError.message &&
-                firstError.message.includes("control character")
-              ) {
-                try {
-                  const normalized = normalizeJsonString(metadata);
-                  body.metadata = JSON.parse(normalized);
-                } catch (secondError) {
-                  // If normalization doesn't help, throw original error with helpful message
-                  throw new z.errors.Error(
-                    `Invalid JSON in Metadata: ${firstError.message}. ` +
-                      `Tip: Multi-line strings in JSON need \\n escape sequences. ` +
-                      `For example, use "line1\\nline2" instead of a multi-line string.`,
-                    "InvalidData",
-                    400
-                  );
-                }
-              } else {
-                throw firstError;
-              }
-            }
-          } else {
-            body.metadata = metadata;
-          }
-        } catch (e) {
-          // If it's already a Zapier error, re-throw it
-          if (e instanceof z.errors.Error) {
-            throw e;
-          }
-          const errorMessage = e.message || "Invalid JSON in Metadata";
-          throw new z.errors.Error(
-            `Invalid JSON in Metadata: ${errorMessage}`,
-            "InvalidData",
-            400
-          );
-        }
+      // With dict type, metadata will be passed as an object
+      if (
+        metadata &&
+        typeof metadata === "object" &&
+        metadata !== null &&
+        Object.keys(metadata).length > 0
+      ) {
+        body.metadata = metadata;
       }
 
       // Generate callback URL for webhook
